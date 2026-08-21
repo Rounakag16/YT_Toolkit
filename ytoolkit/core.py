@@ -116,17 +116,33 @@ def download(url: str, fmt: str = "mp4", quality: str = "best",
     Download a video (mp4) or extract audio (mp3) to your local disk.
     Works for a single video URL or a full playlist URL.
 
-    Returns list of resulting file paths.
+    Returns list of resulting file paths — read directly from yt-dlp's
+    own postprocessor callback rather than guessed from the pre-download
+    filename. Guessing (e.g. swapping the extension ourselves) breaks on
+    titles that already contain a "." in them (a title ending in
+    "...Details.htm" is a real example), so we let yt-dlp tell us what
+    it actually wrote instead of predicting it.
     """
     out_dir = Path(output_dir) if output_dir else config.DOWNLOAD_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
     outtmpl = str(out_dir / "%(playlist_title|)s/%(title)s.%(ext)s")
+
+    final_files: list[str] = []
+
+    def _pp_hook(d: dict) -> None:
+        if d.get("status") == "finished":
+            fp = (d.get("info_dict") or {}).get("filepath") or d.get("filename")
+            if fp:
+                final_files.append(fp)
+
+    hooks = [_pp_hook]
 
     opts: dict[str, Any] = {
         "outtmpl": outtmpl,
         "skip_download": False,
         "noplaylist": False,
         "ignoreerrors": True,
+        "postprocessor_hooks": hooks,
     }
     if progress_hook:
         opts["progress_hooks"] = [progress_hook]
@@ -152,7 +168,7 @@ def download(url: str, fmt: str = "mp4", quality: str = "best",
     opts = base_opts(opts)
     opts["skip_download"] = False
 
-    results = []
+    fallback_files: list[str] = []
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
         entries = info.get("entries") if info.get("entries") is not None else [info]
@@ -160,10 +176,22 @@ def download(url: str, fmt: str = "mp4", quality: str = "best",
             if e is None:
                 continue
             try:
-                fname = ydl.prepare_filename(e)
-                if fmt == "mp3":
-                    fname = str(Path(fname).with_suffix(".mp3"))
-                results.append(fname)
+                fallback_files.append(ydl.prepare_filename(e))
             except Exception:
                 pass
-    return results
+
+    if final_files:
+        # De-dupe while preserving order (postprocessor_hooks can fire more
+        # than once per file across chained postprocessors).
+        seen = set()
+        deduped = []
+        for f in final_files:
+            if f not in seen:
+                seen.add(f)
+                deduped.append(f)
+        return deduped
+
+    # Nothing went through a postprocessor (e.g. a native mp4 that needed
+    # no merge/extraction) — the pre-download filename is already correct
+    # in that case since no extension swap was needed.
+    return fallback_files

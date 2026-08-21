@@ -12,6 +12,7 @@ deploy it; nothing depends on you personally having filesystem access
 to the machine running Flask.
 """
 from pathlib import Path
+from urllib.parse import quote
 
 from flask import Flask, render_template, request, jsonify, send_file, abort
 
@@ -21,9 +22,13 @@ app = Flask(__name__)
 
 
 def _serve_url(abs_path: Path) -> str:
-    """Build a /downloads/... URL for a file inside DOWNLOAD_DIR."""
+    """Build a /downloads/... URL for a file inside DOWNLOAD_DIR, with each
+    path segment percent-encoded so filenames containing spaces, &, |,
+    non-ASCII characters, etc. always produce a valid, unambiguous URL —
+    rather than relying on the browser to guess how to encode a raw
+    string dropped into an href."""
     rel = abs_path.resolve().relative_to(config.DOWNLOAD_DIR.resolve())
-    return "/downloads/" + "/".join(rel.parts)
+    return "/downloads/" + "/".join(quote(part) for part in rel.parts)
 
 
 @app.route("/")
