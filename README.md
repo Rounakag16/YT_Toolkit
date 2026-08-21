@@ -1,13 +1,16 @@
-# ytoolkit — local personal YouTube toolkit
+# ILoveYT 💛
 
-A local-only tool (CLI + web app) for your own personal use: download
+*by Rounak*
+
+A YouTube toolkit (CLI + web app) for you and your friends/family: download
 video/audio, pull video/playlist metadata, and fetch transcripts, with
 optional AI summarization via Gemini (free tier) or a local Ollama model.
 
-**This is for local personal use only.** It is not built or intended to be
-hosted publicly, redistributed to other users, or used to re-share
-downloaded content — doing so runs into YouTube's Terms of Service and
-copyright law. Keep it on your own machine.
+**A note on scope.** This is built for a small, trusted group — not as a
+public product. Video/audio download specifically runs into YouTube's Terms
+of Service regardless of who's hosting it or how many people use it; that
+doesn't go away just because it's "friends and family" rather than the
+general public. Worth keeping in mind if you ever expand who has access.
 
 ## 1. Prerequisites
 
@@ -112,6 +115,12 @@ python cli.py transcript "https://youtube.com/watch?v=VIDEO_ID" --summarize
   a clear "no captions" message instead of a silent failure.
 - **"No transcript available"** — not every video has captions (manual or
   auto-generated). This is a YouTube-side limitation, not a bug.
+- **"ffmpeg was not found on PATH"** — both MP4 merging and MP3 extraction
+  require ffmpeg; the app now checks for it up front and fails with this
+  clear message instead of silently producing a `.webm`/partial file where
+  the real output should be. Install it (see Prerequisites above) and make
+  sure `ffmpeg` works in a *new* terminal window (PATH changes need a
+  fresh shell).
 - **Age-restricted or private videos** fail without cookies. Set
   `YTOOLKIT_COOKIES_FROM_BROWSER=chrome` (or firefox/edge) in `.env` to reuse
   your logged-in browser session, or point `YTOOLKIT_COOKIES_FILE` at an

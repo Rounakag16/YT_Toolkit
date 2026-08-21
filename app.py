@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """
-Web UI for ytoolkit. Run with: python app.py
-Then open http://127.0.0.1:5000
+ILoveYT — web UI. Run with: python app.py, then open http://127.0.0.1:5000
+(or wherever you deploy it).
 
 Every file produced by a "download" action (video, transcript, report)
 is generated on the server and then served back over HTTP with
 Content-Disposition: attachment, so the browser triggers a normal save-
 to-device download — the same way any other file download on the web
-works. That's true whether you're running this locally or after you
-deploy it; nothing depends on you personally having filesystem access
-to the machine running Flask.
+works, whether this is running on your laptop or deployed for you and
+your friends/family to use.
 """
 from pathlib import Path
 from urllib.parse import quote

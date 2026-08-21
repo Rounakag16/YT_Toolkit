@@ -28,8 +28,12 @@ def cmd_download(args):
             print()  # newline after progress
 
     print(f"Downloading ({args.format}, {args.quality}) ...")
-    files = core.download(args.url, fmt=args.format, quality=args.quality,
-                           output_dir=args.output, progress_hook=hook)
+    try:
+        files = core.download(args.url, fmt=args.format, quality=args.quality,
+                               output_dir=args.output, progress_hook=hook)
+    except core.DownloadError as e:
+        print(f"\nError: {e}", file=sys.stderr)
+        sys.exit(1)
     print(f"\nDone. {len(files)} file(s):")
     for f in files:
         print(f"  {f}")

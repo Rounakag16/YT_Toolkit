@@ -1,17 +1,25 @@
 """
 Core operations built on yt-dlp: metadata lookup, playlist listing,
-and local mp3/mp4 download. Everything here runs 100% locally on your
-machine, for your own personal use.
+and local mp3/mp4 download.
 """
 from __future__ import annotations
 
 import datetime as _dt
+import shutil
 from pathlib import Path
 from typing import Any
 
 import yt_dlp
 
 from . import config
+
+
+class DownloadError(RuntimeError):
+    pass
+
+
+def ffmpeg_available() -> bool:
+    return shutil.which("ffmpeg") is not None
 
 
 def base_opts(extra: dict | None = None) -> dict:
@@ -107,45 +115,47 @@ def get_playlist_info(url: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Download (mp3 / mp4) — LOCAL, personal-use only
+# Download (mp3 / mp4)
 # ---------------------------------------------------------------------------
 def download(url: str, fmt: str = "mp4", quality: str = "best",
              output_dir: str | Path | None = None,
              progress_hook=None) -> list[str]:
     """
-    Download a video (mp4) or extract audio (mp3) to your local disk.
+    Download a video (mp4) or extract audio (mp3) to disk.
     Works for a single video URL or a full playlist URL.
 
-    Returns list of resulting file paths — read directly from yt-dlp's
-    own postprocessor callback rather than guessed from the pre-download
-    filename. Guessing (e.g. swapping the extension ourselves) breaks on
-    titles that already contain a "." in them (a title ending in
-    "...Details.htm" is a real example), so we let yt-dlp tell us what
-    it actually wrote instead of predicting it.
+    Both mp3 extraction and mp4 merging require ffmpeg. Without it,
+    yt-dlp doesn't error loudly — it just leaves the raw per-stream
+    download in place (e.g. a .webm audio track instead of .mp3, or
+    separate video/audio files with no merged .mp4 ever produced). That
+    silent degradation is what caused mismatched/missing files before,
+    so we check up front and verify the result matches what was asked
+    for, raising a clear error instead of quietly serving the wrong
+    thing.
     """
+    if not ffmpeg_available():
+        raise DownloadError(
+            "ffmpeg was not found on PATH. It's required for both MP4 "
+            "merging and MP3 extraction — install it and make sure the "
+            "`ffmpeg` command works in a new terminal, then try again. "
+            "(macOS: brew install ffmpeg · Windows: winget install ffmpeg "
+            "· Linux: apt install ffmpeg)"
+        )
+
     out_dir = Path(output_dir) if output_dir else config.DOWNLOAD_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
     outtmpl = str(out_dir / "%(playlist_title|)s/%(title)s.%(ext)s")
-
-    final_files: list[str] = []
-
-    def _pp_hook(d: dict) -> None:
-        if d.get("status") == "finished":
-            fp = (d.get("info_dict") or {}).get("filepath") or d.get("filename")
-            if fp:
-                final_files.append(fp)
-
-    hooks = [_pp_hook]
 
     opts: dict[str, Any] = {
         "outtmpl": outtmpl,
         "skip_download": False,
         "noplaylist": False,
         "ignoreerrors": True,
-        "postprocessor_hooks": hooks,
     }
     if progress_hook:
         opts["progress_hooks"] = [progress_hook]
+
+    expected_ext = "mp3" if fmt == "mp3" else "mp4"
 
     if fmt == "mp3":
         opts.update({
@@ -168,30 +178,57 @@ def download(url: str, fmt: str = "mp4", quality: str = "best",
     opts = base_opts(opts)
     opts["skip_download"] = False
 
-    fallback_files: list[str] = []
+    results: list[str] = []
+    failures: list[str] = []
+
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
         entries = info.get("entries") if info.get("entries") is not None else [info]
+
         for e in entries:
             if e is None:
                 continue
-            try:
-                fallback_files.append(ydl.prepare_filename(e))
-            except Exception:
-                pass
+            title = e.get("title", "unknown")
 
-    if final_files:
-        # De-dupe while preserving order (postprocessor_hooks can fire more
-        # than once per file across chained postprocessors).
-        seen = set()
-        deduped = []
-        for f in final_files:
-            if f not in seen:
-                seen.add(f)
-                deduped.append(f)
-        return deduped
+            # requested_downloads is yt-dlp's own record of the final file
+            # it wrote for this entry (populated after download +
+            # postprocessing complete) — the canonical source of truth,
+            # more reliable than predicting the name ourselves.
+            candidate = None
+            for rd in (e.get("requested_downloads") or []):
+                fp = rd.get("filepath")
+                if fp:
+                    candidate = fp
 
-    # Nothing went through a postprocessor (e.g. a native mp4 that needed
-    # no merge/extraction) — the pre-download filename is already correct
-    # in that case since no extension swap was needed.
-    return fallback_files
+            if not candidate:
+                try:
+                    candidate = ydl.prepare_filename(e)
+                except Exception:
+                    candidate = None
+
+            path = Path(candidate) if candidate else None
+
+            if path and path.is_file() and path.suffix.lstrip(".") == expected_ext:
+                results.append(str(path))
+                continue
+
+            # Predicted path is missing or has the wrong extension (e.g.
+            # merge/extraction silently didn't happen) — do one last
+            # defensive check: is there a same-named file sitting right
+            # there with the expected extension anyway?
+            if path:
+                sibling = path.with_suffix("." + expected_ext)
+                if sibling.is_file():
+                    results.append(str(sibling))
+                    continue
+
+            failures.append(title)
+
+    if failures and not results:
+        raise DownloadError(
+            f"Download finished but no .{expected_ext} file was produced for: "
+            f"{', '.join(failures)}. This usually means ffmpeg failed partway "
+            f"through — check the terminal running app.py for the ffmpeg error."
+        )
+
+    return results
