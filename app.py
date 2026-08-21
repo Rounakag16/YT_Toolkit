@@ -1,17 +1,29 @@
 #!/usr/bin/env python3
 """
-Local web UI for ytoolkit. Run with: python app.py
+Web UI for ytoolkit. Run with: python app.py
 Then open http://127.0.0.1:5000
-This is for LOCAL PERSONAL USE ONLY — it is not meant to be deployed
-publicly or exposed to the internet.
+
+Every file produced by a "download" action (video, transcript, report)
+is generated on the server and then served back over HTTP with
+Content-Disposition: attachment, so the browser triggers a normal save-
+to-device download — the same way any other file download on the web
+works. That's true whether you're running this locally or after you
+deploy it; nothing depends on you personally having filesystem access
+to the machine running Flask.
 """
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, abort
 
 from ytoolkit import core, transcript as tr, ai, config, report as rpt
 
 app = Flask(__name__)
+
+
+def _serve_url(abs_path: Path) -> str:
+    """Build a /downloads/... URL for a file inside DOWNLOAD_DIR."""
+    rel = abs_path.resolve().relative_to(config.DOWNLOAD_DIR.resolve())
+    return "/downloads/" + "/".join(rel.parts)
 
 
 @app.route("/")
@@ -67,8 +79,8 @@ def api_download():
     quality = data.get("quality", "best")
     try:
         files = core.download(url, fmt=fmt, quality=quality)
-        return jsonify({"files": [Path(f).name for f in files],
-                         "dir": str(config.DOWNLOAD_DIR)})
+        items = [{"name": Path(f).name, "url": _serve_url(Path(f))} for f in files]
+        return jsonify({"files": items})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
@@ -93,7 +105,7 @@ def api_playlist_report():
         fname = f"{rpt.safe_filename(report['playlist_title'])}_report.{fmt}"
         out_path = config.DOWNLOAD_DIR / fname
         rpt.save_report(report, out_path, fmt=fmt)
-        return jsonify({"file": fname, "dir": str(config.DOWNLOAD_DIR),
+        return jsonify({"file": fname, "url": _serve_url(out_path),
                          "video_count": report["video_count"]})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -101,8 +113,13 @@ def api_playlist_report():
 
 @app.route("/downloads/<path:filename>")
 def serve_download(filename):
-    # Only serves files that already exist inside the local downloads dir.
-    return send_file(config.DOWNLOAD_DIR / filename, as_attachment=True)
+    target = (config.DOWNLOAD_DIR / filename).resolve()
+    # Guard against path traversal escaping the downloads directory.
+    if config.DOWNLOAD_DIR.resolve() not in target.parents and target != config.DOWNLOAD_DIR.resolve():
+        abort(404)
+    if not target.is_file():
+        abort(404)
+    return send_file(target, as_attachment=True)
 
 
 if __name__ == "__main__":

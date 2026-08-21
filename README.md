@@ -51,7 +51,18 @@ python app.py
 Open http://127.0.0.1:5000 in your browser. Four tabs: Download, Video Info,
 Playlist, Transcript (+ Summarize).
 
-Downloaded files land in `./downloads/` by default.
+Every download (video, transcript export, playlist report) is generated on
+the server and then served back to your browser with a real
+`Content-Disposition: attachment` response — clicking the link in the UI
+triggers a normal browser save-to-device download, the same as downloading
+anything else off the web. This also means it behaves the same after you
+deploy it somewhere, not just on localhost.
+
+To avoid firing duplicate requests from a double-click or repeat click, each
+action button disables itself the instant it's clicked and — on success —
+stays disabled with a "done" label until you edit the URL field, which is
+the signal that you actually want to run it again. On error it re-enables
+immediately so you can just retry.
 
 ## 4. CLI
 
@@ -82,6 +93,9 @@ python cli.py transcript "https://youtube.com/watch?v=VIDEO_ID" --summarize
 
 - Each row in the playlist table has **MP4 / MP3 / Transcript / Summary**
   buttons — click one to act on just that video without leaving the page.
+  The Video Info and Transcript tabs also have their own direct download
+  buttons now, so you don't have to go through the playlist view for a
+  single video.
 - Below the table, **Generate Report** builds a combined file (JSON, CSV,
   or Markdown) with every video's metadata, transcript, and (optionally)
   AI summary. You can also trigger a bulk MP3/MP4 download of the whole

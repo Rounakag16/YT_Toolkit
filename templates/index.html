@@ -56,14 +56,18 @@
         <option value="480p">480p</option>
       </select>
     </div>
-    <button onclick="doDownload()">Download</button>
+    <button id="dl-btn" onclick="doDownload()">Download</button>
     <div class="result" id="dl-result"></div>
   </div>
 
   <!-- INFO -->
   <div class="panel" id="panel-info">
     <input type="text" id="info-url" placeholder="Video URL">
-    <button onclick="doInfo()">Get Info</button>
+    <div class="row">
+      <button id="info-btn" onclick="doInfo()">Get Info</button>
+      <button id="info-dl-mp4-btn" class="secondary" onclick="doInfoDownload('mp4')">Download MP4</button>
+      <button id="info-dl-mp3-btn" class="secondary" onclick="doInfoDownload('mp3')">Download MP3</button>
+    </div>
     <div class="result" id="info-result"></div>
   </div>
 
@@ -105,8 +109,8 @@
       <input type="checkbox" id="tr-timestamps"> <label for="tr-timestamps">Include timestamps</label>
     </div>
     <div class="row">
-      <button onclick="doTranscript()">Get Transcript</button>
-      <button class="secondary" onclick="doSummarize()">Summarize with AI</button>
+      <button id="tr-btn" onclick="doTranscript()">Get Transcript</button>
+      <button id="tr-summarize-btn" class="secondary" onclick="doSummarize()">Summarize with AI</button>
     </div>
     <div class="result" id="tr-result"></div>
   </div>
@@ -125,23 +129,79 @@ async function post(url, body) {
   return r.json();
 }
 
+// --- Click-lock helpers ---------------------------------------------------
+// Prevents the "click twice, two API calls fire" bug: a button is disabled
+// the instant it's clicked (so a burst of clicks before the response comes
+// back only ever fires one request), and on SUCCESS it stays disabled with
+// a "done" label until the linked URL field's contents change — the
+// signal that a new request is actually wanted. On error it re-enables
+// immediately so the same click can just be retried.
+function lock(btn, label) {
+  if (!btn.dataset.origText) btn.dataset.origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = label;
+}
+function unlock(btn) {
+  btn.disabled = false;
+  btn.textContent = btn.dataset.origText || btn.textContent;
+}
+function lockDone(btn, label) {
+  btn.disabled = true;
+  btn.textContent = label;
+}
+function bindUrlUnlock(inputId, btnIds) {
+  document.getElementById(inputId).addEventListener('input', () => {
+    btnIds.forEach(id => unlock(document.getElementById(id)));
+  });
+}
+bindUrlUnlock('dl-url', ['dl-btn']);
+bindUrlUnlock('info-url', ['info-btn', 'info-dl-mp4-btn', 'info-dl-mp3-btn']);
+bindUrlUnlock('tr-url', ['tr-btn', 'tr-summarize-btn']);
+
+// Renders real, clickable download links. The server already sends these
+// files with Content-Disposition: attachment, so clicking one triggers a
+// normal browser "save to device" download — same as downloading anything
+// else off the web, and it works the same after this is deployed.
+function renderDownloadLinks(files) {
+  if (!files || !files.length) return '<p class="muted">No files were produced.</p>';
+  return files.map(f => `<div>✅ <a href="${f.url}" download>${f.name}</a></div>`).join('');
+}
+
+function downloadTextFile(filename, text) {
+  const blob = new Blob([text], {type: 'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// --- Download tab -----------------------------------------------------
 async function doDownload() {
+  const btn = document.getElementById('dl-btn');
+  if (btn.disabled) return;
+  lock(btn, 'Downloading...');
   const el = document.getElementById('dl-result');
-  el.innerHTML = 'Downloading... check the terminal running app.py for progress.';
+  el.innerHTML = 'Downloading — this can take a while for long videos or playlists...';
   const data = await post('/api/download', {
     url: document.getElementById('dl-url').value,
     format: document.getElementById('dl-format').value,
     quality: document.getElementById('dl-quality').value,
   });
-  if (data.error) { el.innerHTML = 'Error: ' + data.error; return; }
-  el.innerHTML = 'Saved to <code>' + data.dir + '</code>:<br>' + data.files.map(f => '- ' + f).join('<br>');
+  if (data.error) { el.innerHTML = 'Error: ' + data.error; unlock(btn); return; }
+  el.innerHTML = renderDownloadLinks(data.files);
+  lockDone(btn, 'Done — edit the URL to download again');
 }
 
+// --- Info tab -----------------------------------------------------------
 async function doInfo() {
+  const btn = document.getElementById('info-btn');
+  if (btn.disabled) return;
+  lock(btn, 'Loading...');
   const el = document.getElementById('info-result');
   el.innerHTML = 'Loading...';
   const data = await post('/api/info', {url: document.getElementById('info-url').value});
-  if (data.error) { el.innerHTML = 'Error: ' + data.error; return; }
+  if (data.error) { el.innerHTML = 'Error: ' + data.error; unlock(btn); return; }
   el.innerHTML = `
     <h3>${data.title}</h3>
     <p class="muted">${data.channel} · ${data.duration_str} · ${data.upload_date}</p>
@@ -149,8 +209,24 @@ async function doInfo() {
     <p class="muted">Captions available: ${data.has_captions}</p>
     <pre>${(data.description||'').slice(0,1000)}</pre>
   `;
+  lockDone(btn, 'Done — edit the URL to reload');
 }
 
+async function doInfoDownload(fmt) {
+  const btn = document.getElementById(fmt === 'mp4' ? 'info-dl-mp4-btn' : 'info-dl-mp3-btn');
+  if (btn.disabled) return;
+  lock(btn, 'Downloading...');
+  const el = document.getElementById('info-result');
+  const msg = document.createElement('div');
+  msg.innerHTML = `Downloading (${fmt})...`;
+  el.appendChild(msg);
+  const data = await post('/api/download', {url: document.getElementById('info-url').value, format: fmt, quality: 'best'});
+  if (data.error) { msg.innerHTML = 'Error: ' + data.error; unlock(btn); return; }
+  msg.innerHTML = renderDownloadLinks(data.files);
+  lockDone(btn, 'Done — edit the URL to download again');
+}
+
+// --- Playlist tab ---------------------------------------------------------
 let playlistVideos = [];
 
 async function doPlaylist() {
@@ -166,12 +242,13 @@ async function doPlaylist() {
       <td>${v.duration_str}</td>
       <td>${v.title}</td>
       <td style="white-space:nowrap;">
-        <button class="secondary" style="padding:.25rem .5rem; font-size:.75rem;" onclick="rowDownload(${idx}, 'mp4')">MP4</button>
-        <button class="secondary" style="padding:.25rem .5rem; font-size:.75rem;" onclick="rowDownload(${idx}, 'mp3')">MP3</button>
-        <button class="secondary" style="padding:.25rem .5rem; font-size:.75rem;" onclick="rowTranscript(${idx})">Transcript</button>
-        <button class="secondary" style="padding:.25rem .5rem; font-size:.75rem;" onclick="rowSummary(${idx})">Summary</button>
+        <button class="secondary" style="padding:.25rem .5rem; font-size:.75rem;" onclick="rowDownload(event, ${idx}, 'mp4')">MP4</button>
+        <button class="secondary" style="padding:.25rem .5rem; font-size:.75rem;" onclick="rowDownload(event, ${idx}, 'mp3')">MP3</button>
+        <button class="secondary" style="padding:.25rem .5rem; font-size:.75rem;" onclick="rowTranscript(event, ${idx})">Transcript</button>
+        <button class="secondary" style="padding:.25rem .5rem; font-size:.75rem;" onclick="rowSummary(event, ${idx})">Summary</button>
       </td>
-    </tr>`).join('');
+    </tr>
+    <tr id="pl-row-result-${idx}"><td colspan="3" style="border-bottom:none; padding-top:0;"></td></tr>`).join('');
 
   el.innerHTML = `
     <h3>${data.playlist_title}</h3>
@@ -181,32 +258,49 @@ async function doPlaylist() {
   document.getElementById('pl-export').style.display = 'block';
 }
 
-async function rowDownload(idx, fmt) {
+async function rowDownload(evt, idx, fmt) {
+  const btn = evt.currentTarget;
+  if (btn.disabled) return;
   const v = playlistVideos[idx];
-  const el = document.getElementById('pl-result');
-  const msg = document.createElement('div');
-  msg.className = 'muted';
-  msg.textContent = `Downloading (${fmt}): ${v.title} ...`;
-  el.appendChild(msg);
+  const origLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = '...';
+  const cell = document.querySelector(`#pl-row-result-${idx} td`);
+  cell.innerHTML = `<span class="muted">Downloading (${fmt}): ${v.title}...</span>`;
   const data = await post('/api/download', {url: v.url, format: fmt, quality: 'best'});
-  msg.textContent = data.error ? `Error: ${data.error}` : `Saved: ${data.files.join(', ')} -> ${data.dir}`;
+  cell.innerHTML = data.error ? `<span class="muted">Error: ${data.error}</span>` : renderDownloadLinks(data.files);
+  btn.disabled = false; btn.textContent = origLabel;
 }
 
-function rowTranscript(idx) {
+async function rowTranscript(evt, idx) {
+  const btn = evt.currentTarget;
+  if (btn.disabled) return;
+  btn.disabled = true;
   const v = playlistVideos[idx];
   document.querySelector('.tab[data-tab="transcript"]').click();
   document.getElementById('tr-url').value = v.url;
-  doTranscript();
+  unlock(document.getElementById('tr-btn'));
+  await doTranscript();
+  btn.disabled = false;
 }
 
-function rowSummary(idx) {
+async function rowSummary(evt, idx) {
+  const btn = evt.currentTarget;
+  if (btn.disabled) return;
+  btn.disabled = true;
   const v = playlistVideos[idx];
   document.querySelector('.tab[data-tab="transcript"]').click();
   document.getElementById('tr-url').value = v.url;
-  doTranscript().then(() => doSummarize());
+  unlock(document.getElementById('tr-btn'));
+  unlock(document.getElementById('tr-summarize-btn'));
+  await doTranscript();
+  await doSummarize();
+  btn.disabled = false;
 }
 
 async function doPlaylistExport() {
+  const btn = document.querySelector('#pl-export button');
+  if (btn.disabled) return;
+  lock(btn, 'Building report...');
   const el = document.getElementById('export-result');
   const dlFormat = document.getElementById('export-dl-format').value;
   el.innerHTML = 'Building report... this can take a while for long playlists.';
@@ -217,41 +311,66 @@ async function doPlaylistExport() {
     include_summary: document.getElementById('export-summary').checked,
     format: document.getElementById('export-format').value,
   });
-  if (reportData.error) { el.innerHTML = 'Error: ' + reportData.error; return; }
-  el.innerHTML = `Report ready: <code>${reportData.dir}/${reportData.file}</code> ` +
-    `<a href="/downloads/${encodeURIComponent(reportData.file)}">(download)</a>`;
+  if (reportData.error) { el.innerHTML = 'Error: ' + reportData.error; unlock(btn); return; }
+  el.innerHTML = `✅ Report ready: <a href="${reportData.url}" download>${reportData.file}</a>`;
 
   if (dlFormat !== 'none') {
     el.innerHTML += '<br>Downloading all videos, this can take a while...';
     const dlData = await post('/api/download', {
       url: document.getElementById('pl-url').value, format: dlFormat, quality: 'best'
     });
-    el.innerHTML += dlData.error
-      ? `<br>Download error: ${dlData.error}`
-      : `<br>Downloaded ${dlData.files.length} files to <code>${dlData.dir}</code>`;
+    el.innerHTML += '<br>' + (dlData.error ? `Download error: ${dlData.error}` : renderDownloadLinks(dlData.files));
   }
+  lockDone(btn, 'Done — change the playlist URL to run again');
 }
 
+// --- Transcript tab ---------------------------------------------------
 let lastTranscript = '';
+let lastSummary = '';
+
 async function doTranscript() {
+  const btn = document.getElementById('tr-btn');
+  if (btn.disabled) return;
+  lock(btn, 'Loading...');
   const el = document.getElementById('tr-result');
   el.innerHTML = 'Loading...';
   const data = await post('/api/transcript', {
     url: document.getElementById('tr-url').value,
     timestamps: document.getElementById('tr-timestamps').checked
   });
-  if (data.error || data.available === false) { el.innerHTML = 'Error: ' + (data.error || data.reason); return; }
+  if (data.error || data.available === false) {
+    el.innerHTML = 'Error: ' + (data.error || data.reason);
+    unlock(btn);
+    return;
+  }
   lastTranscript = data.text;
-  el.innerHTML = `<p class="muted">${data.language} (${data.is_generated ? 'auto' : 'manual'})</p><pre>${data.text}</pre>`;
+  el.innerHTML = `
+    <p class="muted">${data.language} (${data.is_generated ? 'auto' : 'manual'})</p>
+    <pre>${data.text}</pre>
+    <button class="secondary" onclick="downloadTextFile('transcript.txt', lastTranscript)">Download transcript (.txt)</button>
+  `;
+  lockDone(btn, 'Done — edit the URL to fetch again');
 }
 
 async function doSummarize() {
+  const btn = document.getElementById('tr-summarize-btn');
+  if (btn.disabled) return;
   if (!lastTranscript) { alert('Get a transcript first.'); return; }
+  lock(btn, 'Summarizing...');
   const el = document.getElementById('tr-result');
-  el.innerHTML += '<p class="muted">Summarizing...</p>';
+  const msg = document.createElement('div');
+  msg.className = 'muted';
+  msg.textContent = 'Summarizing...';
+  el.appendChild(msg);
   const data = await post('/api/summarize', {text: lastTranscript});
-  if (data.error) { el.innerHTML += '<p>Error: ' + data.error + '</p>'; return; }
-  el.innerHTML += `<h4>Summary</h4><pre>${data.summary}</pre>`;
+  if (data.error) { msg.textContent = 'Error: ' + data.error; unlock(btn); return; }
+  lastSummary = data.summary;
+  msg.outerHTML = `
+    <h4>Summary</h4>
+    <pre>${data.summary}</pre>
+    <button class="secondary" onclick="downloadTextFile('summary.txt', lastSummary)">Download summary (.txt)</button>
+  `;
+  lockDone(btn, 'Done — edit the URL to summarize again');
 }
 </script>
 </body>
