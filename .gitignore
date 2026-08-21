@@ -1,0 +1,33 @@
+# --- Secrets / local config ---
+.env
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+venv/
+.venv/
+env/
+ENV/
+
+# --- Downloads & generated output ---
+downloads/
+*.mp3
+*.mp4
+*.mkv
+*.webm
+*.m4a
+*_report.json
+*_report.csv
+*_report.md
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
