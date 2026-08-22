@@ -750,7 +750,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   // #app-source tag for why this replaces Babel's automatic script scan.
   (function () {
     const source = document.getElementById("app-source").textContent;
-    const compiled = Babel.transform(source, { presets: ["react"] }).code;
+    // { runtime: "classic" } forces old-style React.createElement(...) output
+    // instead of the "automatic" runtime's default, which emits
+    // `import { jsx as _jsx } from "react/jsx-runtime"` at the top of the
+    // compiled code — that import is what was breaking execution, since
+    // there's no bundler here to resolve it. Classic runtime needs nothing
+    // but the global `React` we already load via the UMD script tag.
+    const compiled = Babel.transform(source, {
+      presets: [["react", { runtime: "classic" }]],
+    }).code;
     const s = document.createElement("script");
     s.textContent = compiled;
     document.body.appendChild(s);
