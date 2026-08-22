@@ -51,8 +51,17 @@ everything else works with `YTOOLKIT_AI_PROVIDER=none`.
 ```bash
 python app.py
 ```
-Open http://127.0.0.1:5000 in your browser. Four tabs: Download, Video Info,
-Playlist, Transcript (+ Summarize).
+Open http://127.0.0.1:5000 in your browser.
+
+The frontend is a **React app** (sidebar navigation: Home, Download, Video
+Info, Playlist, Transcript, AI Summary, History) served as a single
+`templates/index.html`. It loads React, Babel, and Tailwind from CDNs and
+compiles the JSX right in the browser — there's no `npm install` or build
+step, so deployment is still exactly `python app.py`. The trade-off is a
+bit more work for the browser on first load (in-browser JSX compilation)
+versus a pre-built bundle; for a small personal/family deployment that's a
+reasonable trade, but if this ever needs to scale to a lot of concurrent
+users, moving to a proper Vite build would be the next step.
 
 Every download (video, transcript export, playlist report) is generated on
 the server and then served back to your browser with a real
@@ -61,11 +70,16 @@ triggers a normal browser save-to-device download, the same as downloading
 anything else off the web. This also means it behaves the same after you
 deploy it somewhere, not just on localhost.
 
-To avoid firing duplicate requests from a double-click or repeat click, each
-action button disables itself the instant it's clicked and — on success —
-stays disabled with a "done" label until you edit the URL field, which is
-the signal that you actually want to run it again. On error it re-enables
-immediately so you can just retry.
+Every action panel (Download, Info, Transcript, Summary, each playlist row)
+follows the same rule: only one request in flight at a time, and the moment
+you change *any* input — URL, format, quality, checkboxes — the previous
+result is cleared and the button re-enables. That's what stops a stale MP4
+link from lingering on screen after you've switched the format to MP3, and
+what stops a double-click from firing two downloads.
+
+Recent actions are kept in a **History** tab (and "Recent Tools" on Home),
+stored in your browser's local storage — it's per-browser, not shared
+across devices or people using the deployment.
 
 ## 4. CLI
 
