@@ -47,6 +47,15 @@ def base_opts(extra: dict | None = None) -> dict:
         "no_warnings": True,
         "noplaylist": False,
         "skip_download": True,
+        # YouTube's "web"/"web_safari" clients increasingly require a PO
+        # (proof-of-origin) token that a plain server-side yt-dlp can't
+        # solve, surfacing as "The page needs to be reloaded." — even on
+        # a fully up-to-date yt-dlp. android_vr isn't (yet) subject to
+        # that requirement, so we ask yt-dlp to try it first and fall
+        # back to its normal default client list if that one changes too.
+        # This is yt-dlp's own documented workaround (see their pinned
+        # Known Issues/FAQ), not something specific to this app.
+        "extractor_args": {"youtube": {"player_client": ["android_vr", "default"]}},
     }
     if config.COOKIES_FROM_BROWSER:
         opts["cookiesfrombrowser"] = (config.COOKIES_FROM_BROWSER,)
