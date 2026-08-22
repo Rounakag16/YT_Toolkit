@@ -146,6 +146,41 @@ python cli.py transcript "https://youtube.com/watch?v=VIDEO_ID" --summarize
   and merges video+audio with ffmpeg — this can be large/slow for long
   videos; use 720p/480p for faster results.
 
+## 7. Deploying (Render)
+
+This app is a real, persistent Flask process with ffmpeg subprocess calls
+and local disk writes — that rules out serverless hosts like Vercel, whose
+functions time out after 10–60s and don't ship ffmpeg. **Render** (or
+Railway, Fly.io, a plain VPS — anything that runs a normal long-lived
+container) fits it properly. Steps for Render:
+
+1. Push this repo to GitHub if it isn't already.
+2. In the Render dashboard: **New → Blueprint**, point it at the repo. It
+   picks up `render.yaml` and `Dockerfile` automatically — the Dockerfile
+   installs ffmpeg via apt, which Render's plain Python runtime doesn't
+   include.
+3. Set environment variables in the Render dashboard (the blueprint marks
+   these `sync: false` so they're not stored in the repo):
+   - `ILOVEYT_USER` / `ILOVEYT_PASS` — **do this** before sharing the link.
+     Once it's deployed it's a public URL; without these, anyone who finds
+     it can trigger downloads and AI calls on your bill. Leave both unset
+     only if you're fine with that.
+   - `YTOOLKIT_AI_PROVIDER=gemini` + `GEMINI_API_KEY` if you want AI
+     summaries. **Ollama won't work here** — it'd need to run on the same
+     machine as the app, and Render's servers aren't your machine. Gemini
+     (cloud API) is the option that actually works once deployed.
+4. Deploy. Free tier spins the instance down after inactivity, so the
+   first request after a quiet period takes ~30–60s to wake back up —
+   normal for free hosting, not a bug.
+
+If you specifically want Vercel anyway — e.g. to try it — Info/Transcript/
+Summary alone (no downloading) might work within its timeout, but expect
+MP4/MP3 downloads to fail intermittently or outright on anything but very
+short clips, since there's no way around the execution time limit or the
+missing ffmpeg binary on that platform. Happy to put together a
+lightweight-only Vercel config if you want to see for yourself, but Render
+is the one that matches what this app actually does.
+
 ## Project structure
 
 ```
@@ -155,10 +190,14 @@ ytoolkit/
     transcript.py   # caption/transcript fetching
     ai.py           # pluggable Gemini / Ollama summarization
     config.py       # env-based settings
+    report.py       # playlist report builder
   cli.py            # command-line interface
-  app.py            # Flask web app
+  app.py            # Flask web app (with optional Basic Auth gate)
   templates/index.html
-  downloads/        # default output folder
+  downloads/        # default local output folder
   requirements.txt
+  Dockerfile        # for Render/Docker-based deployment
+  .dockerignore
+  render.yaml       # Render Blueprint
   .env.example
 ```

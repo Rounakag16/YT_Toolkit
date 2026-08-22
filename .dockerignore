@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+venv/
+.venv/
+__pycache__/
+*.pyc
+downloads/
+*.mp3
+*.mp4
+*.mkv
+*.webm
+*.m4a

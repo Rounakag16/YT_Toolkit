@@ -1,42 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ILoveYT 💛</title>
 
-<!-- React + Babel (in-browser JSX, no build step needed — keeps deployment
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ILoveYT 💛</title>
+
+  <!-- React + Babel (in-browser JSX, no build step needed — keeps deployment
      as simple as `python app.py`) + Tailwind via CDN for styling. -->
-<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        colors: {
-          brand: { 50:'#fff1f4', 100:'#ffe0e7', 400:'#ff6b8f', 500:'#ff4d78', 600:'#e93368', 700:'#c81f54' },
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#fff1f4', 100: '#ffe0e7', 400: '#ff6b8f', 500: '#ff4d78', 600: '#e93368', 700: '#c81f54' },
+          }
         }
       }
     }
-  }
-</script>
-<style>
-  @keyframes heartBeat { 0%,100% { transform:scale(1); } 25% { transform:scale(1.18); } 40% { transform:scale(1); } }
-  .heartbeat { animation: heartBeat 2.2s ease-in-out infinite; display:inline-block; }
-  ::-webkit-scrollbar { width:8px; height:8px; }
-  ::-webkit-scrollbar-thumb { background:#e5e7eb; border-radius:8px; }
-  .grad-text {
-    background: linear-gradient(90deg,#ff4d78,#ff8a5c);
-    -webkit-background-clip:text; background-clip:text; color:transparent;
-  }
-</style>
-</head>
-<body class="bg-gray-50 text-gray-900">
-<div id="root"></div>
+  </script>
+  <style>
+    @keyframes heartBeat {
 
-<!-- type="text/plain" here on purpose: Babel standalone's automatic page
+      0%,
+      100% {
+        transform: scale(1);
+      }
+
+      25% {
+        transform: scale(1.18);
+      }
+
+      40% {
+        transform: scale(1);
+      }
+    }
+
+    .heartbeat {
+      animation: heartBeat 2.2s ease-in-out infinite;
+      display: inline-block;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #e5e7eb;
+      border-radius: 8px;
+    }
+
+    .grad-text {
+      background: linear-gradient(90deg, #ff4d78, #ff8a5c);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 text-gray-900">
+  <div id="root"></div>
+
+  <!-- type="text/plain" here on purpose: Babel standalone's automatic page
      scanner (transformScriptTags) walks every <script> tag on the page
      looking for ones to compile, and in this environment that scan was
      tripping over one of the OTHER CDN scripts above (React/Tailwind),
@@ -44,7 +75,7 @@
      ever got to our own code. Giving our script a type Babel's scanner
      doesn't recognize keeps it out of that auto-scan entirely — we then
      compile and run it ourselves, deterministically, right below. -->
-<script type="text/plain" id="app-source">
+  <script type="text/plain" id="app-source">
 const { useState, useEffect, useRef, useCallback } = React;
 
 // ---------------------------------------------------------------------
@@ -182,7 +213,7 @@ function Select(props) {
 
 function Card({ children, className = "" }) {
   return (
-    <div className={"bg-white rounded-2xl border border-gray-100 shadow-sm p-6 " + className}>
+    <div className={"bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 " + className}>
       {children}
     </div>
   );
@@ -233,37 +264,68 @@ const NAV_ITEMS = [
   { id: "history", label: "History", icon: "🕑" },
 ];
 
-function Sidebar({ tab, setTab }) {
+function Sidebar({ tab, setTab, open, setOpen }) {
   return (
-    <aside className="w-60 shrink-0 bg-white border-r border-gray-100 h-screen sticky top-0 flex flex-col">
-      <div className="flex items-center gap-2 px-5 py-5 border-b border-gray-100">
-        <span className="text-2xl heartbeat">💛</span>
-        <span className="text-lg font-extrabold tracking-tight">
-          ILOVE<span className="grad-text">YT</span>
-        </span>
-      </div>
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {NAV_ITEMS.map(item => (
-          <button
-            key={item.id}
-            onClick={() => setTab(item.id)}
-            className={
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all " +
-              (tab === item.id
-                ? "bg-brand-50 text-brand-600"
-                : "text-gray-600 hover:bg-gray-50")
-            }
-          >
-            <span>{item.icon}</span>{item.label}
-          </button>
-        ))}
-      </nav>
-      <div className="m-3 p-4 rounded-2xl bg-gradient-to-br from-brand-50 to-orange-50 border border-brand-100">
-        <div className="text-sm font-bold text-brand-700">🚀 100% Free. No Ads.</div>
-        <p className="text-xs text-gray-500 mt-1">Built for you, your friends & family. No signup, no limits.</p>
-        <p className="text-xs text-gray-400 mt-3">Made with <span className="heartbeat inline-block">💛</span> by Rounak</p>
-      </div>
-    </aside>
+    <React.Fragment>
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/30 z-30 lg:hidden"
+          onClick={() => setOpen(false)}
+        ></div>
+      )}
+      <aside
+        className={
+          "w-64 shrink-0 bg-white border-r border-gray-100 flex flex-col z-40 " +
+          "fixed inset-y-0 left-0 h-screen transform transition-transform duration-200 ease-out " +
+          (open ? "translate-x-0" : "-translate-x-full") +
+          " lg:translate-x-0 lg:sticky lg:top-0"
+        }
+      >
+        <div className="flex items-center justify-between gap-2 px-5 py-5 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl heartbeat">💛</span>
+            <span className="text-lg font-extrabold tracking-tight">
+              ILOVE<span className="grad-text">YT</span>
+            </span>
+          </div>
+          <button className="lg:hidden text-gray-400 text-xl leading-none px-1" onClick={() => setOpen(false)}>✕</button>
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {NAV_ITEMS.map(item => (
+            <button
+              key={item.id}
+              onClick={() => { setTab(item.id); setOpen(false); }}
+              className={
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all " +
+                (tab === item.id
+                  ? "bg-brand-50 text-brand-600"
+                  : "text-gray-600 hover:bg-gray-50")
+              }
+            >
+              <span>{item.icon}</span>{item.label}
+            </button>
+          ))}
+        </nav>
+        <div className="m-3 p-4 rounded-2xl bg-gradient-to-br from-brand-50 to-orange-50 border border-brand-100">
+          <div className="text-sm font-bold text-brand-700">🚀 100% Free. No Ads.</div>
+          <p className="text-xs text-gray-500 mt-1">Built for you, your friends & family. No signup, no limits.</p>
+          <p className="text-xs text-gray-400 mt-3">Made with <span className="heartbeat inline-block">💛</span> by Rounak</p>
+        </div>
+      </aside>
+    </React.Fragment>
+  );
+}
+
+// A slim top bar shown only below the lg breakpoint, since the sidebar
+// itself is off-canvas there — this is what opens it.
+function MobileTopBar({ onOpen }) {
+  return (
+    <div className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 sticky top-0 z-20">
+      <button onClick={onOpen} className="text-2xl leading-none px-1 text-gray-600">☰</button>
+      <span className="font-extrabold tracking-tight">
+        ILOVE<span className="grad-text">YT</span>
+      </span>
+    </div>
   );
 }
 
@@ -294,15 +356,15 @@ function Home({ setTab, prefillDownload, history }) {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="text-center pt-10 pb-8">
-        <h1 className="text-4xl font-extrabold tracking-tight">
+      <div className="text-center pt-4 sm:pt-10 pb-6 sm:pb-8">
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight px-2">
           Your all-in-one <span className="grad-text">YouTube</span> toolkit
         </h1>
-        <p className="text-gray-500 mt-3 max-w-xl mx-auto">
+        <p className="text-gray-500 mt-3 max-w-xl mx-auto px-2 text-sm sm:text-base">
           Download videos, extract transcripts, analyze playlists, and get AI summaries — all in one place.
         </p>
 
-        <div className="mt-8 max-w-2xl mx-auto flex gap-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-2">
+        <div className="mt-6 sm:mt-8 max-w-2xl mx-auto flex flex-col sm:flex-row gap-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-2">
           <div className="flex items-center gap-2 flex-1 px-3">
             <span className="text-gray-400">🔗</span>
             <input
@@ -314,7 +376,7 @@ function Home({ setTab, prefillDownload, history }) {
           </div>
           <button
             onClick={() => { prefillDownload(url); setTab("download"); }}
-            className="px-6 py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-brand-500 to-orange-400 hover:shadow-lg hover:shadow-brand-200 transition-all flex items-center gap-1"
+            className="px-6 py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-brand-500 to-orange-400 hover:shadow-lg hover:shadow-brand-200 transition-all flex items-center justify-center gap-1"
           >
             Go →
           </button>
@@ -336,7 +398,7 @@ function Home({ setTab, prefillDownload, history }) {
 
       <div className="mt-12">
         <h2 className="font-bold text-lg mb-4">Why use ILoveYT?</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
           {[
             ["⚡", "Fast & Reliable", "Runs on your own setup — no queue, no throttling."],
             ["🔒", "Private", "Files are generated for you on request, not tracked or sold."],
@@ -360,7 +422,7 @@ function Home({ setTab, prefillDownload, history }) {
             <h2 className="font-bold text-lg">Recent Tools</h2>
             <button onClick={() => setTab("history")} className="text-sm text-brand-600 hover:underline">View all</button>
           </div>
-          <Card className="p-0 divide-y divide-gray-100">
+          <Card className="!p-0 divide-y divide-gray-100">
             {history.slice(0, 5).map((h, i) => (
               <div key={i} className="flex items-center justify-between px-5 py-3 text-sm">
                 <div className="flex items-center gap-3 min-w-0">
@@ -397,7 +459,7 @@ function DownloadPanel({ addHistory, prefillUrl }) {
     <Card className="max-w-2xl">
       <h2 className="font-bold text-lg mb-4">⬇️ Download</h2>
       <TextInput value={url} onChange={e => setUrl(e.target.value)} placeholder="Video or playlist URL" className="mb-3" />
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
         <Select value={format} onChange={e => setFormat(e.target.value)}>
           <option value="mp4">MP4 (video)</option>
           <option value="mp3">MP3 (audio only)</option>
@@ -563,13 +625,13 @@ function PlaylistRow({ video, addHistory, goTranscript, goSummary }) {
   }
 
   return (
-    <div className="px-4 py-3 border-b border-gray-50 last:border-0">
-      <div className="flex items-center justify-between gap-3">
+    <div className="px-3 sm:px-4 py-3 border-b border-gray-50 last:border-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium truncate">{video.title}</div>
           <div className="text-xs text-gray-400">{video.duration_str}</div>
         </div>
-        <div className="flex gap-1.5 shrink-0">
+        <div className="flex flex-wrap gap-1.5 shrink-0">
           <SecondaryButton className="!px-2.5 !py-1 text-xs" onClick={() => download("mp4")} disabled={dl.disabled}>
             {dl.status === "loading" ? "..." : "MP4"}
           </SecondaryButton>
@@ -641,7 +703,7 @@ function PlaylistPanel({ addHistory, setTab, setTranscriptPrefill, setSummaryPre
           <Card>
             <div className="font-semibold text-sm mb-3">Export a combined report</div>
             <p className="text-xs text-gray-500 mb-3">Can take a while for long playlists, more with summaries on (one AI call per video).</p>
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <Select value={format} onChange={e => setFormat(e.target.value)}>
                 <option value="json">JSON</option>
                 <option value="csv">CSV</option>
@@ -719,50 +781,55 @@ function App() {
   const [downloadPrefill, setDownloadPrefill] = useState("");
   const [transcriptPrefill, setTranscriptPrefill] = useState("");
   const [summaryPrefill, setSummaryPrefill] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar tab={tab} setTab={setTab} />
-      <main className="flex-1 p-8 overflow-x-hidden">
-        {tab === "home" && <Home setTab={setTab} prefillDownload={setDownloadPrefill} history={history} />}
-        {tab === "download" && <DownloadPanel addHistory={addHistory} prefillUrl={downloadPrefill} />}
-        {tab === "info" && <InfoPanel addHistory={addHistory} />}
-        {tab === "playlist" && (
-          <PlaylistPanel
-            addHistory={addHistory}
-            setTab={setTab}
-            setTranscriptPrefill={setTranscriptPrefill}
-            setSummaryPrefill={setSummaryPrefill}
-          />
-        )}
-        {tab === "transcript" && <TranscriptPanel addHistory={addHistory} prefillUrl={transcriptPrefill} />}
-        {tab === "summary" && <SummaryPanel addHistory={addHistory} prefillUrl={summaryPrefill} />}
-        {tab === "history" && <HistoryPanel history={history} clearHistory={clearHistory} />}
-      </main>
+    <div className="lg:flex min-h-screen">
+      <Sidebar tab={tab} setTab={setTab} open={sidebarOpen} setOpen={setSidebarOpen} />
+      <div className="flex-1 min-w-0 flex flex-col">
+        <MobileTopBar onOpen={() => setSidebarOpen(true)} />
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
+          {tab === "home" && <Home setTab={setTab} prefillDownload={setDownloadPrefill} history={history} />}
+          {tab === "download" && <DownloadPanel addHistory={addHistory} prefillUrl={downloadPrefill} />}
+          {tab === "info" && <InfoPanel addHistory={addHistory} />}
+          {tab === "playlist" && (
+            <PlaylistPanel
+              addHistory={addHistory}
+              setTab={setTab}
+              setTranscriptPrefill={setTranscriptPrefill}
+              setSummaryPrefill={setSummaryPrefill}
+            />
+          )}
+          {tab === "transcript" && <TranscriptPanel addHistory={addHistory} prefillUrl={transcriptPrefill} />}
+          {tab === "summary" && <SummaryPanel addHistory={addHistory} prefillUrl={summaryPrefill} />}
+          {tab === "history" && <HistoryPanel history={history} clearHistory={clearHistory} />}
+        </main>
+      </div>
     </div>
   );
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
-<script>
-  // Manually compile the JSX above and run it — see the comment on the
-  // #app-source tag for why this replaces Babel's automatic script scan.
-  (function () {
-    const source = document.getElementById("app-source").textContent;
-    // { runtime: "classic" } forces old-style React.createElement(...) output
-    // instead of the "automatic" runtime's default, which emits
-    // `import { jsx as _jsx } from "react/jsx-runtime"` at the top of the
-    // compiled code — that import is what was breaking execution, since
-    // there's no bundler here to resolve it. Classic runtime needs nothing
-    // but the global `React` we already load via the UMD script tag.
-    const compiled = Babel.transform(source, {
-      presets: [["react", { runtime: "classic" }]],
-    }).code;
-    const s = document.createElement("script");
-    s.textContent = compiled;
-    document.body.appendChild(s);
-  })();
-</script>
+  <script>
+      // Manually compile the JSX above and run it — see the comment on the
+      // #app-source tag for why this replaces Babel's automatic script scan.
+      (function () {
+        const source = document.getElementById("app-source").textContent;
+        // { runtime: "classic" } forces old-style React.createElement(...) output
+        // instead of the "automatic" runtime's default, which emits
+        // `import { jsx as _jsx } from "react/jsx-runtime"` at the top of the
+        // compiled code — that import is what was breaking execution, since
+        // there's no bundler here to resolve it. Classic runtime needs nothing
+        // but the global `React` we already load via the UMD script tag.
+        const compiled = Babel.transform(source, {
+          presets: [["react", { runtime: "classic" }]],
+        }).code;
+        const s = document.createElement("script");
+        s.textContent = compiled;
+        document.body.appendChild(s);
+      })();
+  </script>
 </body>
+
 </html>

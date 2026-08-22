@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: ilovyt
+    env: docker
+    plan: free
+    envVars:
+      # Set these in the Render dashboard (marked sync: false so they're
+      # not stored in this file / your repo).
+      - key: ILOVEYT_USER
+        sync: false
+      - key: ILOVEYT_PASS
+        sync: false
+      - key: YTOOLKIT_AI_PROVIDER
+        value: none          # change to "gemini" if you set GEMINI_API_KEY below
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.0-flash

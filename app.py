@@ -10,14 +10,36 @@ to-device download — the same way any other file download on the web
 works, whether this is running on your laptop or deployed for you and
 your friends/family to use.
 """
+import os
 from pathlib import Path
 from urllib.parse import quote
 
-from flask import Flask, render_template, request, jsonify, send_file, abort
+from flask import Flask, render_template, request, jsonify, send_file, abort, Response
 
 from ytoolkit import core, transcript as tr, ai, config, report as rpt
 
 app = Flask(__name__)
+
+# --- Optional shared-password gate --------------------------------------
+# Off by default (no env vars set = no auth, exactly like before — fine
+# for local use). Once this is reachable from the internet, anyone with
+# the link can trigger downloads/AI calls on your bill, so set
+# ILOVEYT_USER / ILOVEYT_PASS before deploying somewhere public.
+_AUTH_USER = os.environ.get("ILOVEYT_USER")
+_AUTH_PASS = os.environ.get("ILOVEYT_PASS")
+
+
+@app.before_request
+def _require_auth():
+    if not _AUTH_USER or not _AUTH_PASS:
+        return None  # auth not configured — behave exactly as before
+    auth = request.authorization
+    if not auth or auth.username != _AUTH_USER or auth.password != _AUTH_PASS:
+        return Response(
+            "Login required", 401,
+            {"WWW-Authenticate": 'Basic realm="ILoveYT"'},
+        )
+    return None
 
 
 def _serve_url(abs_path: Path) -> str:
@@ -127,4 +149,6 @@ def serve_download(filename):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    app.run(host="0.0.0.0", port=port, debug=debug)
