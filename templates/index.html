@@ -36,7 +36,15 @@
 <body class="bg-gray-50 text-gray-900">
 <div id="root"></div>
 
-<script type="text/babel" data-presets="react">
+<!-- type="text/plain" here on purpose: Babel standalone's automatic page
+     scanner (transformScriptTags) walks every <script> tag on the page
+     looking for ones to compile, and in this environment that scan was
+     tripping over one of the OTHER CDN scripts above (React/Tailwind),
+     throwing "Cannot use import statement outside a module" before it
+     ever got to our own code. Giving our script a type Babel's scanner
+     doesn't recognize keeps it out of that auto-scan entirely — we then
+     compile and run it ourselves, deterministically, right below. -->
+<script type="text/plain" id="app-source">
 const { useState, useEffect, useRef, useCallback } = React;
 
 // ---------------------------------------------------------------------
@@ -736,6 +744,17 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+<script>
+  // Manually compile the JSX above and run it — see the comment on the
+  // #app-source tag for why this replaces Babel's automatic script scan.
+  (function () {
+    const source = document.getElementById("app-source").textContent;
+    const compiled = Babel.transform(source, { presets: ["react"] }).code;
+    const s = document.createElement("script");
+    s.textContent = compiled;
+    document.body.appendChild(s);
+  })();
 </script>
 </body>
 </html>
