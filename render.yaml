@@ -16,3 +16,11 @@ services:
         sync: false
       - key: GEMINI_MODEL
         value: gemini-3.6-flash
+      # Render's IPs are shared/datacenter IPs YouTube often flags as bot
+      # traffic ("Sign in to confirm you're not a bot"). Passing cookies
+      # from a real logged-in browser session fixes it. The path below is
+      # where Render mounts a Secret File named "cookies.txt" — you add
+      # that file's actual contents in the dashboard, not here (see
+      # README "Deploying" section for how to export it).
+      - key: YTOOLKIT_COOKIES_FILE
+        value: /etc/secrets/cookies.txt

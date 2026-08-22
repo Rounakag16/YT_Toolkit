@@ -172,6 +172,45 @@ container) fits it properly. Steps for Render:
 4. Deploy. Free tier spins the instance down after inactivity, so the
    first request after a quiet period takes ~30–60s to wake back up —
    normal for free hosting, not a bug.
+5. If downloads fail with **"Sign in to confirm you're not a bot"** —
+   very common once you're running from a cloud IP instead of your home
+   connection — see "Fixing the bot-check error" just below.
+
+### Fixing the "Sign in to confirm you're not a bot" error
+
+Render's IPs are shared with lots of other services, and YouTube is quick
+to flag that kind of traffic and demand a real login. The fix is giving
+yt-dlp cookies from an actual logged-in browser session:
+
+1. **Export your cookies.** Install a browser extension like "Get
+   cookies.txt LOCALLY" (Chrome/Firefox), log into YouTube normally in
+   that browser, open youtube.com, and use the extension to export
+   cookies for the site in Netscape format — you'll get a `cookies.txt`
+   file.
+2. **A word on which account to use:** this file is effectively that
+   Google account's login session — treat it like a password, and never
+   commit it to your repo. Consider using a secondary/throwaway Google
+   account rather than your primary one: if YouTube ever flags the
+   account for automated-looking traffic, better that it's not the one
+   with your personal email and history attached. The session in the
+   file will also expire eventually (days to weeks, YouTube doesn't
+   publish a fixed lifetime), so re-exporting periodically if this error
+   comes back is expected maintenance, not a new bug.
+3. **Upload it to Render as a Secret File**, not an env var: in the
+   Render dashboard, open your service → **Environment** → **Secret
+   Files** → **Add Secret File** → name it exactly `cookies.txt` and
+   paste the file's contents. Render mounts it at `/etc/secrets/cookies.txt`
+   inside the container at runtime.
+4. `render.yaml` already points `YTOOLKIT_COOKIES_FILE` at that exact
+   path, so once the secret file exists there's nothing else to
+   configure — redeploy (or it'll pick it up on the next deploy) and
+   retry the download.
+
+For local/CLI use this same mechanism works via `.env`'s
+`YTOOLKIT_COOKIES_FILE`, or `YTOOLKIT_COOKIES_FROM_BROWSER=chrome` to
+reuse your local browser's session directly without exporting a file at
+all (that option only works when yt-dlp runs on the same machine as the
+browser, so it's local-only, not for Render).
 
 If you specifically want Vercel anyway — e.g. to try it — Info/Transcript/
 Summary alone (no downloading) might work within its timeout, but expect
