@@ -18,6 +18,25 @@ class DownloadError(RuntimeError):
     pass
 
 
+class _ErrorCollector:
+    """Passed to yt-dlp as a custom logger so we can recover the real
+    error message when `ignoreerrors` swallows a failure and hands back
+    None instead of raising. Without this, a bad cookies file, a region-
+    blocked video, or any other real yt-dlp failure all collapse into the
+    same unhelpful "'NoneType' object has no attribute 'get'" crash."""
+    def __init__(self):
+        self.errors: list[str] = []
+
+    def debug(self, msg):
+        pass
+
+    def warning(self, msg):
+        pass
+
+    def error(self, msg):
+        self.errors.append(str(msg))
+
+
 def ffmpeg_available() -> bool:
     return shutil.which("ffmpeg") is not None
 
@@ -152,6 +171,8 @@ def download(url: str, fmt: str = "mp4", quality: str = "best",
         "noplaylist": False,
         "ignoreerrors": True,
     }
+    error_collector = _ErrorCollector()
+    opts["logger"] = error_collector
     if progress_hook:
         opts["progress_hooks"] = [progress_hook]
 
@@ -183,6 +204,17 @@ def download(url: str, fmt: str = "mp4", quality: str = "best",
 
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
+
+        if info is None:
+            # ignoreerrors swallowed whatever actually went wrong — this is
+            # where we recover the real reason instead of crashing on
+            # None.get(...) with a message that explains nothing.
+            if error_collector.errors:
+                detail = " / ".join(error_collector.errors)
+            else:
+                detail = "yt-dlp returned no result and logged no specific error."
+            raise DownloadError(f"Download failed: {detail}")
+
         entries = info.get("entries") if info.get("entries") is not None else [info]
 
         for e in entries:
@@ -225,10 +257,11 @@ def download(url: str, fmt: str = "mp4", quality: str = "best",
             failures.append(title)
 
     if failures and not results:
+        detail = f" Underlying yt-dlp error(s): {' / '.join(error_collector.errors)}" if error_collector.errors else ""
         raise DownloadError(
             f"Download finished but no .{expected_ext} file was produced for: "
             f"{', '.join(failures)}. This usually means ffmpeg failed partway "
-            f"through — check the terminal running app.py for the ffmpeg error."
+            f"through, or yt-dlp itself failed on that entry.{detail}"
         )
 
     return results
