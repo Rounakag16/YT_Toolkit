@@ -7,6 +7,16 @@ Copy .env.example -> .env and fill in what you need.
 import os
 from pathlib import Path
 
+import sys
+
+print(f"[debug] Python: {sys.version}")
+
+try:
+    import yt_dlp
+    print(f"[debug] yt-dlp version: {yt_dlp.version.__version__}")
+except Exception as e:
+    print(f"[debug] yt-dlp version check failed: {e}")
+
 try:
     from dotenv import load_dotenv
     load_dotenv()
