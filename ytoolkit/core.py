@@ -221,6 +221,54 @@ def download(url: str, fmt: str = "mp4", quality: str = "best",
     results: list[str] = []
     failures: list[str] = []
 
+    print("=" * 70, flush=True)
+    print("[YTOOLKIT DEBUG] Starting yt-dlp download", flush=True)
+    print(f"[YTOOLKIT DEBUG] URL: {url}", flush=True)
+    print(f"[YTOOLKIT DEBUG] Format: {fmt}", flush=True)
+    print(f"[YTOOLKIT DEBUG] Quality: {quality}", flush=True)
+    print(
+        f"[YTOOLKIT DEBUG] yt-dlp version: "
+        f"{yt_dlp.version.__version__}",
+        flush=True
+    )
+
+    print(
+        f"[YTOOLKIT DEBUG] Cookies configured: "
+        f"{bool(config.COOKIES_FILE)}",
+        flush=True
+    )
+
+    if config.COOKIES_FILE:
+        cookie_path = Path(config.COOKIES_FILE)
+
+        print(
+            f"[YTOOLKIT DEBUG] Cookie path: {cookie_path}",
+            flush=True
+        )
+
+        print(
+            f"[YTOOLKIT DEBUG] Cookie exists: "
+            f"{cookie_path.is_file()}",
+            flush=True
+        )
+
+        if cookie_path.is_file():
+            print(
+                f"[YTOOLKIT DEBUG] Cookie size: "
+                f"{cookie_path.stat().st_size} bytes",
+                flush=True
+            )
+
+    print("[YTOOLKIT DEBUG] yt-dlp options:", flush=True)
+
+    safe_opts = dict(opts)
+
+    if "cookiefile" in safe_opts:
+        safe_opts["cookiefile"] = "[REDACTED]"
+
+    print(safe_opts, flush=True)
+    print("=" * 70, flush=True)
+
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
 
