@@ -190,8 +190,6 @@ def download(url: str, fmt: str = "mp4", quality: str = "best",
         "verbose": True,
     }
 
-    error_collector = _ErrorCollector()
-    opts["logger"] = error_collector
     if progress_hook:
         opts["progress_hooks"] = [progress_hook]
 
