@@ -34,36 +34,83 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
 
+
+
 # --- yt-dlp settings --------------------------------------------------
-# Path to a browser cookies file (Netscape format) or a browser name
-# (e.g. "chrome", "firefox") for yt-dlp's --cookies-from-browser.
-# Only needed for age-restricted / login-required videos, or when
-# YouTube starts demanding a login from a datacenter IP (common once
-# deployed to a host like Render).
+
 COOKIES_FROM_BROWSER = os.getenv("YTOOLKIT_COOKIES_FROM_BROWSER", "")
 
 _raw_cookies_file = os.getenv("YTOOLKIT_COOKIES_FILE", "")
 COOKIES_FILE = ""
+
 if _raw_cookies_file:
     _src = Path(_raw_cookies_file)
+
+    print(f"[cookies] Source: {_src}")
+    print(f"[cookies] Exists: {_src.is_file()}")
+
     if _src.is_file():
-        # yt-dlp doesn't just read this file — it rewrites it in place
-        # after each run to persist any refreshed session cookies. That
-        # write fails with "Read-only file system" if the source is a
-        # read-only mount, which is exactly what Render's Secret Files
-        # are. Copy it once to a writable temp location at startup and
-        # point yt-dlp at the copy instead — same cookies, just somewhere
-        # yt-dlp is actually allowed to update.
-        import shutil
-        import tempfile
-        _writable_copy = Path(tempfile.gettempdir()) / "ytoolkit_cookies.txt"
         try:
-            shutil.copyfile(_src, _writable_copy)
-            COOKIES_FILE = str(_writable_copy)
-        except OSError:
-            # Fall back to the original path rather than crash at import
-            # time — yt-dlp will surface its own clear error if this path
-            # turns out to be unusable too.
-            COOKIES_FILE = str(_src)
+            print(f"[cookies] Size: {_src.stat().st_size} bytes")
+
+            # Check the ORIGINAL Render Secret File.
+            with _src.open("rb") as f:
+                source_header = f.read(256)
+
+            source_valid = b"Netscape HTTP Cookie File" in source_header
+            print(f"[cookies] Source Netscape header: {source_valid}")
+
+            if not source_valid:
+                print(
+                    "[cookies] ERROR: Source file does not appear "
+                    "to be a Netscape cookies file."
+                )
+            else:
+                import shutil
+                import tempfile
+
+                # Create a unique writable temporary file.
+                fd, temp_path = tempfile.mkstemp(
+                    prefix="ytoolkit_cookies_",
+                    suffix=".txt"
+                )
+                os.close(fd)
+
+                _writable_copy = Path(temp_path)
+
+                # Copy byte-for-byte.
+                shutil.copyfile(_src, _writable_copy)
+
+                print(f"[cookies] Writable copy: {_writable_copy}")
+                print(
+                    f"[cookies] Copy size: "
+                    f"{_writable_copy.stat().st_size} bytes"
+                )
+
+                # Verify the COPY.
+                with _writable_copy.open("rb") as f:
+                    copy_header = f.read(256)
+
+                copy_valid = b"Netscape HTTP Cookie File" in copy_header
+                print(f"[cookies] Copy Netscape header: {copy_valid}")
+
+                if copy_valid:
+                    COOKIES_FILE = str(_writable_copy)
+                    print("[cookies] Cookie file ready for yt-dlp.")
+                else:
+                    print(
+                        "[cookies] ERROR: Copy is not a valid "
+                        "Netscape cookies file."
+                    )
+
+        except (OSError, ValueError) as exc:
+            print(f"[cookies] ERROR preparing cookies: {exc}")
+            COOKIES_FILE = ""
+
     else:
-        COOKIES_FILE = _raw_cookies_file
+        print(
+            f"[cookies] ERROR: Cookie file does not exist: {_src}"
+        )
+
+else:
+    print("[cookies] No YTOOLKIT_COOKIES_FILE configured.")
