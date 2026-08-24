@@ -615,7 +615,7 @@ function SummaryPanel({ addHistory, prefillUrl }) {
         <div className="mt-4">
           <div
             className="prose prose-sm prose-purple max-w-none bg-purple-50 border border-purple-100 rounded-lg p-4 max-h-96 overflow-auto"
-            dangerouslySetInnerHTML={{ __html: marked.parse(result.summary) }}
+            dangerouslySetInnerHTML={ { __html: marked.parse(result.summary) } }
           />
           <div className="mt-3 flex gap-2">
             <SecondaryButton onClick={() => downloadTextFile("summary.md", result.summary)}>
