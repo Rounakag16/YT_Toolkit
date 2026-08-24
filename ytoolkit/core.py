@@ -51,7 +51,12 @@ def base_opts(extra: dict | None = None) -> dict:
         "skip_download": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android_vr", "default"]
+                # android_vr does not support cookies — yt-dlp skips it
+                # entirely once a cookiefile/cookiesfrombrowser is set,
+                # so it was never actually being used for authenticated
+                # requests. web/mweb/android all honor cookies and are
+                # tried in order; the first that works wins.
+                "player_client": ["web", "mweb", "android"]
             }
         },
     }

@@ -6,8 +6,16 @@
 FROM python:3.11-slim
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get install -y --no-install-recommends ffmpeg curl unzip ca-certificates && \
     rm -rf /var/lib/apt/lists/*
+
+# yt-dlp now needs to run a JS challenge solver (EJS) to decode YouTube's
+# per-request "n" throttling parameter — without a JS runtime, requests
+# get throttled/rejected and extraction eventually fails with
+# "The page needs to be reloaded." Deno is yt-dlp's recommended/default
+# runtime for this (sandboxed, no extra Node toolchain needed).
+ENV DENO_INSTALL=/usr/local
+RUN curl -fsSL https://deno.land/install.sh | sh && deno --version
 
 WORKDIR /app
 
