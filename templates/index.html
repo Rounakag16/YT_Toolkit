@@ -12,8 +12,11 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
   <!-- marked: renders the AI summary's markdown (###, **bold**, lists, etc.)
-       as real HTML instead of showing the raw markdown syntax to the user. -->
-  <script src="https://unpkg.com/marked/marked.min.js"></script>
+       as real HTML instead of showing the raw markdown syntax to the user.
+       Pinned to a specific verified build — the unversioned unpkg URL
+       resolves to whatever npm currently calls "latest", which stopped
+       exposing window.marked at the root path and broke this silently. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/18.0.9/lib/marked.umd.min.js"></script>
   <!-- ?plugins=typography adds the `prose` utility classes used to style
        the rendered summary HTML without writing custom CSS per element. -->
   <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
@@ -605,7 +608,7 @@ function SummaryPanel({ addHistory, prefillUrl }) {
   return (
     <Card className="max-w-2xl">
       <h2 className="font-bold text-lg mb-4">✨ AI Summary</h2>
-      <p className="text-sm text-gray-500 mb-3">Pulls the transcript automatically, then summarizes it with your configured AI provider (Gemini or Ollama — set in <code>.env</code>).</p>
+      <p className="text-sm text-gray-500 mb-3">Pulls the transcript automatically, then generates a clean AI summary — key points, no fluff.</p>
       <TextInput value={url} onChange={e => setUrl(e.target.value)} placeholder="Video URL" className="mb-4" />
       <PrimaryButton onClick={go} disabled={disabled || !url}>
         {status === "loading" ? <Spinner label="Summarizing..." /> : status === "done" ? "Done — edit URL to summarize again" : "Summarize"}
@@ -613,10 +616,14 @@ function SummaryPanel({ addHistory, prefillUrl }) {
       {error && <ErrorBox>{error}</ErrorBox>}
       {result && result.summary && (
         <div className="mt-4">
-          <div
-            className="prose prose-sm prose-purple max-w-none bg-purple-50 border border-purple-100 rounded-lg p-4 max-h-96 overflow-auto"
-            dangerouslySetInnerHTML={ { __html: marked.parse(result.summary) } }
-          />
+          {typeof marked !== "undefined" ? (
+            <div
+              className="prose prose-sm prose-purple max-w-none bg-purple-50 border border-purple-100 rounded-lg p-4 max-h-96 overflow-auto"
+              dangerouslySetInnerHTML={ { __html: marked.parse(result.summary) } }
+            />
+          ) : (
+            <pre className="text-sm bg-purple-50 border border-purple-100 rounded-lg p-3 max-h-96 overflow-auto whitespace-pre-wrap">{result.summary}</pre>
+          )}
           <div className="mt-3 flex gap-2">
             <SecondaryButton onClick={() => downloadTextFile("summary.md", result.summary)}>
               ⬇️ Download (.md)
