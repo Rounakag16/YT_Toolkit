@@ -11,7 +11,12 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- marked: renders the AI summary's markdown (###, **bold**, lists, etc.)
+       as real HTML instead of showing the raw markdown syntax to the user. -->
+  <script src="https://unpkg.com/marked/marked.min.js"></script>
+  <!-- ?plugins=typography adds the `prose` utility classes used to style
+       the rendered summary HTML without writing custom CSS per element. -->
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -582,13 +587,18 @@ function SummaryPanel({ addHistory, prefillUrl }) {
   useEffect(() => { if (prefillUrl) setUrl(prefillUrl); }, [prefillUrl]);
   const { status, result, error, run, disabled } = useAction([url]);
 
+  // Both steps (transcript fetch + summarize) now happen INSIDE run(), so
+  // status flips to "loading" the instant the button is clicked — not
+  // after the transcript fetch (which can take a few seconds on its own)
+  // has already finished. That's what made the spinner appear "late".
   async function go() {
-    const t = await api("/api/transcript", { url });
-    if (t.error || t.available === false) {
-      await run(() => Promise.resolve({ error: t.error || t.reason }));
-      return;
-    }
-    const data = await run(() => api("/api/summarize", { text: t.text }));
+    const data = await run(async () => {
+      const t = await api("/api/transcript", { url });
+      if (t.error || t.available === false) {
+        return { error: t.error || t.reason };
+      }
+      return api("/api/summarize", { text: t.text });
+    });
     if (data) addHistory({ type: "AI Summary", title: url });
   }
 
@@ -603,10 +613,18 @@ function SummaryPanel({ addHistory, prefillUrl }) {
       {error && <ErrorBox>{error}</ErrorBox>}
       {result && result.summary && (
         <div className="mt-4">
-          <pre className="text-sm bg-purple-50 border border-purple-100 rounded-lg p-3 max-h-80 overflow-auto whitespace-pre-wrap">{result.summary}</pre>
-          <SecondaryButton className="mt-3" onClick={() => downloadTextFile("summary.txt", result.summary)}>
-            ⬇️ Download summary (.txt)
-          </SecondaryButton>
+          <div
+            className="prose prose-sm prose-purple max-w-none bg-purple-50 border border-purple-100 rounded-lg p-4 max-h-96 overflow-auto"
+            dangerouslySetInnerHTML={{ __html: marked.parse(result.summary) }}
+          />
+          <div className="mt-3 flex gap-2">
+            <SecondaryButton onClick={() => downloadTextFile("summary.md", result.summary)}>
+              ⬇️ Download (.md)
+            </SecondaryButton>
+            <SecondaryButton onClick={() => downloadTextFile("summary.txt", result.summary)}>
+              ⬇️ Download (.txt)
+            </SecondaryButton>
+          </div>
         </div>
       )}
     </Card>
