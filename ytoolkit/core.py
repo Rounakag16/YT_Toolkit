@@ -13,28 +13,30 @@ import yt_dlp
 
 from . import config
 
+class YTDLPLogger:
+    """Log all yt-dlp output to Render logs while collecting errors."""
+
+    def __init__(self):
+        self.errors: list[str] = []
+
+    def debug(self, msg):
+        print(f"[yt-dlp DEBUG] {msg}", flush=True)
+
+    def info(self, msg):
+        print(f"[yt-dlp INFO] {msg}", flush=True)
+
+    def warning(self, msg):
+        print(f"[yt-dlp WARNING] {msg}", flush=True)
+
+    def error(self, msg):
+        message = str(msg)
+        self.errors.append(message)
+        print(f"[yt-dlp ERROR] {message}", flush=True)
 
 class DownloadError(RuntimeError):
     pass
 
 
-class _ErrorCollector:
-    """Passed to yt-dlp as a custom logger so we can recover the real
-    error message when `ignoreerrors` swallows a failure and hands back
-    None instead of raising. Without this, a bad cookies file, a region-
-    blocked video, or any other real yt-dlp failure all collapse into the
-    same unhelpful "'NoneType' object has no attribute 'get'" crash."""
-    def __init__(self):
-        self.errors: list[str] = []
-
-    def debug(self, msg):
-        pass
-
-    def warning(self, msg):
-        pass
-
-    def error(self, msg):
-        self.errors.append(str(msg))
 
 
 def ffmpeg_available() -> bool:
@@ -43,19 +45,15 @@ def ffmpeg_available() -> bool:
 
 def base_opts(extra: dict | None = None) -> dict:
     opts: dict[str, Any] = {
-        "quiet": True,
-        "no_warnings": True,
+        "quiet": False,
+        "no_warnings": False,
         "noplaylist": False,
         "skip_download": True,
-        # YouTube's "web"/"web_safari" clients increasingly require a PO
-        # (proof-of-origin) token that a plain server-side yt-dlp can't
-        # solve, surfacing as "The page needs to be reloaded." — even on
-        # a fully up-to-date yt-dlp. android_vr isn't (yet) subject to
-        # that requirement, so we ask yt-dlp to try it first and fall
-        # back to its normal default client list if that one changes too.
-        # This is yt-dlp's own documented workaround (see their pinned
-        # Known Issues/FAQ), not something specific to this app.
-        "extractor_args": {"youtube": {"player_client": ["android_vr", "default"]}},
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android_vr", "default"]
+            }
+        },
     }
     if config.COOKIES_FROM_BROWSER:
         opts["cookiesfrombrowser"] = (config.COOKIES_FROM_BROWSER,)
@@ -174,12 +172,24 @@ def download(url: str, fmt: str = "mp4", quality: str = "best",
     out_dir.mkdir(parents=True, exist_ok=True)
     outtmpl = str(out_dir / "%(playlist_title|)s/%(title)s.%(ext)s")
 
+    logger = YTDLPLogger()
+
     opts: dict[str, Any] = {
         "outtmpl": outtmpl,
         "skip_download": False,
         "noplaylist": False,
-        "ignoreerrors": True,
+
+        # IMPORTANT:
+        # Don't swallow the real yt-dlp exception while debugging.
+        "ignoreerrors": False,
+
+        # Send yt-dlp's complete logging through our logger.
+        "logger": logger,
+
+        # Make yt-dlp print its internal debug information.
+        "verbose": True,
     }
+
     error_collector = _ErrorCollector()
     opts["logger"] = error_collector
     if progress_hook:
@@ -215,13 +225,11 @@ def download(url: str, fmt: str = "mp4", quality: str = "best",
         info = ydl.extract_info(url, download=True)
 
         if info is None:
-            # ignoreerrors swallowed whatever actually went wrong — this is
-            # where we recover the real reason instead of crashing on
-            # None.get(...) with a message that explains nothing.
-            if error_collector.errors:
-                detail = " / ".join(error_collector.errors)
+            if logger.errors:
+                detail = " / ".join(logger.errors)
             else:
                 detail = "yt-dlp returned no result and logged no specific error."
+
             raise DownloadError(f"Download failed: {detail}")
 
         entries = info.get("entries") if info.get("entries") is not None else [info]
@@ -266,7 +274,11 @@ def download(url: str, fmt: str = "mp4", quality: str = "best",
             failures.append(title)
 
     if failures and not results:
-        detail = f" Underlying yt-dlp error(s): {' / '.join(error_collector.errors)}" if error_collector.errors else ""
+        detail = (
+            f" Underlying yt-dlp error(s): {' / '.join(logger.errors)}"
+            if logger.errors
+            else ""
+        )
         raise DownloadError(
             f"Download finished but no .{expected_ext} file was produced for: "
             f"{', '.join(failures)}. This usually means ffmpeg failed partway "
